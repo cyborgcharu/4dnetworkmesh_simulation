@@ -1,8 +1,11 @@
 import random
 
+global population = 100000
+global nodes = []
+
 class Node:
-    def __init__(self):
-        self.id = random.randint(1,40)
+    def __init__(self, population):
+        self.id = random.randint(1,population)
 
 class Env:
     def __init__(self):
