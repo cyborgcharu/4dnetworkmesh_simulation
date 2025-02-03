@@ -1,5 +1,6 @@
 import random
 
+global t = 0
 global population = 100000
 global nodes = []
 
