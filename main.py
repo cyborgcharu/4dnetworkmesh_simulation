@@ -1,41 +1,36 @@
 import random
 
-global t = 0
-global population = 100000
-global nodes = []
 
 class Node:
-    def __init__(self, population):
-        self.id = random.randint(1,population)
+    def __init__(self, id):
+        self.id = id
+        self.x = 0
+        self.y = 0
+
+    def __repr__(self):
+        return f'Node({self.id}, x={self.x}, y={self.y})'
+
+    def move(self, x, y):
+        self.x = x
+        self.y = y
+
 
 class Env:
     def __init__(self):
-        self.id = 0
+        self.nodes = []
+        self.t = 0
+
+    def generate_nodes(self, population):
+        for i in range(population):
+            self.nodes.append(Node(i))
+
+    def show_nodes(self):
+        for node in self.nodes:
+            print(node)
 
 
-def create_env():
-    """Instantiate an environment of nodes with coordinates at time t=0.
-
-    Returns::
-    <Env>
-    """
-
-def move(node, x, y):
-    """Move a particular node to: (x, y) from: current location.
-
-    Parameters::
-    node : <Node>
-    x : int
-    y : int
-
-    Returns::
-    <Null>
-    """
-
-def main():
-    """
-    """
-    print("simulation started... t=0")
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    env = Env()
+    print(f'simulation started... t={env.t}')
+    env.generate_nodes(10)
+    env.show_nodes()
