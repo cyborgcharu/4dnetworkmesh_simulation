@@ -4,6 +4,8 @@ from typing import List, Dict, Set, Optional, Tuple
 from enum import Enum
 import random
 import math
+import networkx as nx
+import matplotlib.pyplot as plt
 
 class CommunicationType(Enum):
     BLE = "BLE"          # Short range (<10m)
@@ -120,6 +122,12 @@ class NetworkMesh:
 
     def add_node(self, node: Node):
         # Initialize with random velocity
+        max_speed = 5.0  # units per second
+        node.velocity = (
+            random.uniform(-max_speed, max_speed),
+            random.uniform(-max_speed, max_speed),
+            random.uniform(-max_speed/10, max_speed/10)  # Less vertical movement
+        )
         self.nodes.append(node)
 
     def simulate_step(self, dt: float):
@@ -161,47 +169,107 @@ class NetworkMesh:
         print(f"Step {int(self.time)}: Time={self.time:.1f}, Active nodes={active_nodes}, "
               f"Connections={len(connections)}, Battery levels: "
               f"min={min(n.battery_level for n in self.nodes):.1f}, "
-              f"max={max(n.battery_level for n in self.nodes):.1f}, "
               f"avg={sum(n.battery_level for n in self.nodes)/len(self.nodes):.1f}")
+        
+        return connections
+
+class NetworkVisualizer:
+    def __init__(self, mesh: NetworkMesh):
+        self.mesh = mesh
+        self.G = nx.Graph()
+        self.pos = {}
+        self.node_colors = []
+        self.edge_colors = []
+        
+        # Create a single figure that we'll reuse
+        self.fig = plt.figure(figsize=(12, 8))
+        
+        # Color mapping for different protocols
+        self.protocol_colors = {
+            CommunicationType.BLE: '#1f77b4',    # Blue
+            CommunicationType.WIFI: '#2ca02c',   # Green
+            CommunicationType.GPS: '#ff7f0e',    # Orange
+            CommunicationType.CUSTOM: '#9467bd'  # Purple
+        }
+        
+        # Node state colors
+        self.state_colors = {
+            NodeState.ACTIVE: '#2ecc71',         # Green
+            NodeState.OFFLINE: '#e74c3c',        # Red
+            NodeState.INTERMITTENT: '#f1c40f'    # Yellow
+        }
+
+    def update_graph(self, connections):
+        """Updates the graph based on current mesh state"""
+        self.G.clear()
+        self.node_colors = []
+        self.edge_colors = []
+        
+        # Add nodes
+        for node in self.mesh.nodes:
+            self.G.add_node(node.id)
+            # Use 2D projection for visualization
+            self.pos[node.id] = (node.position.x, node.position.y)
+            
+            # Set node color based on state
+            self.node_colors.append(self.state_colors[node.state])
+            
+            # Add node attributes
+            self.G.nodes[node.id]['battery'] = node.battery_level
+            self.G.nodes[node.id]['protocols'] = [p.value for p in node.protocols]
+            self.G.nodes[node.id]['state'] = node.state.value
+
+        # Add edges based on active connections
+        for source_id, target_id, protocol in connections:
+            self.G.add_edge(source_id, target_id)
+            self.edge_colors.append(self.protocol_colors[protocol])
+
+    def draw(self):
+        """Draws the current state of the network"""
+        # Clear the current figure instead of creating a new one
+        plt.clf()
+        
+        # Draw the network
+        nx.draw_networkx_nodes(self.G, self.pos, 
+                             node_color=self.node_colors,
+                             node_size=300)
+        
+        if self.edge_colors:  # Only draw edges if there are any
+            nx.draw_networkx_edges(self.G, self.pos,
+                                 edge_color=self.edge_colors,
+                                 width=2, alpha=0.5)
+        
+        # Add labels
+        labels = {node: f"Node {node}\n{self.G.nodes[node]['battery']:.0f}%" 
+                 for node in self.G.nodes()}
+        nx.draw_networkx_labels(self.G, self.pos, labels, font_size=8)
+        
+        # Add legend
+        legend_elements = [
+            plt.Line2D([0], [0], marker='o', color='w', 
+                      markerfacecolor=color, label=state.value, markersize=10)
+            for state, color in self.state_colors.items()
+        ] + [
+            plt.Line2D([0], [0], color=color, label=proto.value)
+            for proto, color in self.protocol_colors.items()
+        ]
+        plt.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1))
+        
+        plt.title(f'Network Mesh State (t={self.mesh.time:.1f}s)')
+        plt.axis('off')
+        plt.tight_layout()
+        
+        # Update the display
+        plt.draw()
+        plt.pause(0.1)  # Short pause to allow the display to update
 
 class Simulation:
     def __init__(self, size: Tuple[float, float, float] = (1000.0, 1000.0, 100.0)):
         self.mesh = NetworkMesh(bounds=size)
         self.size = size
+        self.visualizer = None
 
-    def generate_grid_nodes(self, rows: int, columns: int, index_offset: int = 0):
-        dx = self.size[0] / columns
-        dy = self.size[1] / rows
-
-        for row in range(rows):
-            for column in range(columns):
-                position = Position(
-                    x = column * dx,
-                    y = row * dy,
-                    z = self.size[2] / 2,
-                    t=0.0
-                )
-
-                protocols = {CommunicationType.BLE}  # All nodes have BLE
-                if random.random() < 0.8:  # 80% chance of having WiFi
-                    protocols.add(CommunicationType.WIFI)
-                if random.random() < 0.3:  # 30% chance of having GPS
-                    protocols.add(CommunicationType.GPS)
-                if random.random() < 0.2:  # 20% chance of having custom protocol
-                    protocols.add(CommunicationType.CUSTOM)
-
-                node = Node(
-                    id= (row + column) + index_offset,
-                    position=position,
-                    protocols=protocols,
-                    state=NodeState.ACTIVE
-                )
-                node.velocity = (0.0, 0.0, 0.0)
-                self.mesh.add_node(node)
-
-            index_offset += columns - 1
-
-    def generate_random_nodes(self, count: int, index_offset: int = 0):
+    def generate_random_nodes(self, count: int):
         for i in range(count):
             position = Position(
                 x=random.uniform(0, self.size[0]),
@@ -220,27 +288,32 @@ class Simulation:
                 protocols.add(CommunicationType.CUSTOM)
 
             node = Node(
-                id=i + index_offset,
+                id=i,
                 position=position,
                 protocols=protocols,
                 state=NodeState.ACTIVE
             )
-
-            max_speed = 5.0  # units per second
-            node.velocity = (
-                random.uniform(-max_speed, max_speed),
-                random.uniform(-max_speed, max_speed),
-                random.uniform(-max_speed/10, max_speed/10)  # Less vertical movement
-            )
-
             self.mesh.add_node(node)
 
-    def run(self, steps: int, dt: float = 1.0):
+    def run(self, steps: int, dt: float = 1.0, visualize: bool = True):
+        if visualize:
+            self.visualizer = NetworkVisualizer(self.mesh)
+            plt.ion()  # Turn on interactive mode
+        
         for step in range(steps):
-            self.mesh.simulate_step(dt)
+            connections = self.mesh.simulate_step(dt)
+            
+            if visualize and step % 5 == 0:  # Update visualization every 5 steps
+                self.visualizer.update_graph(connections)
+                self.visualizer.draw()
+        
+        if visualize:
+            plt.ioff()  # Turn off interactive mode
+            plt.show()  # Keep the final plot visible
 
 if __name__ == '__main__':
     sim = Simulation(size=(200.0, 200.0, 50.0))
-    sim.generate_grid_nodes(2, 4)
-    sim.generate_random_nodes(20, 10)
-    sim.run(steps=100)
+    
+    sim.generate_random_nodes(20)
+    
+    sim.run(steps=100, dt=1.0, visualize=True)
