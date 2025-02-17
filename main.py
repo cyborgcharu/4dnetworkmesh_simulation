@@ -51,7 +51,7 @@ class Node:
     memory: Dict = field(default_factory=dict)
     velocity: Tuple[float, float, float] = field(default_factory=lambda: (0.0, 0.0, 0.0))
 
-    # ranges of distance for Communication Type protocols
+    # ranges of distance for protocols
     PROTOCOL_RANGES = {
         CommunicationType.BLE: 10.0,
         CommunicationType.WIFI: 100.0,
@@ -59,7 +59,7 @@ class Node:
         CommunicationType.CUSTOM: 50.0
     }
 
-    # rates of battery consumption for Communication Type protocols
+    # rates of battery consumption for protocols
     BATTERY_DRAIN_RATES = {
         CommunicationType.BLE: 0.01,
         CommunicationType.WIFI: 0.05,
@@ -126,7 +126,7 @@ class NetworkMesh:
         node.velocity = (
             random.uniform(-max_speed, max_speed),
             random.uniform(-max_speed, max_speed),
-            random.uniform(-max_speed/10, max_speed/10)  # Less vertical movement
+            random.uniform(-max_speed/10, max_speed/10)
         )
         self.nodes.append(node)
 
@@ -140,7 +140,7 @@ class NetworkMesh:
                 # Update position
                 node.update_position(dt)
 
-                # Boundary checking - bounce off walls
+                # Boundary checking
                 for i in range(3):
                     if node.position.x < 0 or node.position.x > self.bounds[0]:
                         node.velocity = (-node.velocity[0], node.velocity[1], node.velocity[2])
@@ -181,7 +181,6 @@ class NetworkVisualizer:
         self.node_colors = []
         self.edge_colors = []
         
-        # Create a single figure that we'll reuse
         self.fig = plt.figure(figsize=(12, 8))
         
         # Color mapping for different protocols
@@ -205,46 +204,41 @@ class NetworkVisualizer:
         self.node_colors = []
         self.edge_colors = []
         
-        # Add nodes
+
         for node in self.mesh.nodes:
             self.G.add_node(node.id)
-            # Use 2D projection for visualization
+
             self.pos[node.id] = (node.position.x, node.position.y)
             
-            # Set node color based on state
             self.node_colors.append(self.state_colors[node.state])
             
-            # Add node attributes
             self.G.nodes[node.id]['battery'] = node.battery_level
             self.G.nodes[node.id]['protocols'] = [p.value for p in node.protocols]
             self.G.nodes[node.id]['state'] = node.state.value
 
-        # Add edges based on active connections
+
         for source_id, target_id, protocol in connections:
             self.G.add_edge(source_id, target_id)
             self.edge_colors.append(self.protocol_colors[protocol])
 
     def draw(self):
         """Draws the current state of the network"""
-        # Clear the current figure instead of creating a new one
         plt.clf()
         
-        # Draw the network
+
         nx.draw_networkx_nodes(self.G, self.pos, 
                              node_color=self.node_colors,
                              node_size=300)
         
-        if self.edge_colors:  # Only draw edges if there are any
+        if self.edge_colors:  
             nx.draw_networkx_edges(self.G, self.pos,
                                  edge_color=self.edge_colors,
                                  width=2, alpha=0.5)
         
-        # Add labels
         labels = {node: f"Node {node}\n{self.G.nodes[node]['battery']:.0f}%" 
                  for node in self.G.nodes()}
         nx.draw_networkx_labels(self.G, self.pos, labels, font_size=8)
         
-        # Add legend
         legend_elements = [
             plt.Line2D([0], [0], marker='o', color='w', 
                       markerfacecolor=color, label=state.value, markersize=10)
@@ -259,9 +253,8 @@ class NetworkVisualizer:
         plt.axis('off')
         plt.tight_layout()
         
-        # Update the display
         plt.draw()
-        plt.pause(0.1)  # Short pause to allow the display to update
+        plt.pause(0.1) 
 
 class Simulation:
     def __init__(self, size: Tuple[float, float, float] = (1000.0, 1000.0, 100.0)):
@@ -298,18 +291,18 @@ class Simulation:
     def run(self, steps: int, dt: float = 1.0, visualize: bool = True):
         if visualize:
             self.visualizer = NetworkVisualizer(self.mesh)
-            plt.ion()  # Turn on interactive mode
+            plt.ion()
         
         for step in range(steps):
             connections = self.mesh.simulate_step(dt)
             
-            if visualize and step % 5 == 0:  # Update visualization every 5 steps
+            if visualize and step % 10 == 0:  # Update visualization every 10 steps
                 self.visualizer.update_graph(connections)
                 self.visualizer.draw()
         
         if visualize:
-            plt.ioff()  # Turn off interactive mode
-            plt.show()  # Keep the final plot visible
+            plt.ioff()  
+            plt.show() 
 
 if __name__ == '__main__':
     sim = Simulation(size=(200.0, 200.0, 50.0))
