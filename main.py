@@ -120,12 +120,6 @@ class NetworkMesh:
 
     def add_node(self, node: Node):
         # Initialize with random velocity
-        max_speed = 5.0  # units per second
-        node.velocity = (
-            random.uniform(-max_speed, max_speed),
-            random.uniform(-max_speed, max_speed),
-            random.uniform(-max_speed/10, max_speed/10)  # Less vertical movement
-        )
         self.nodes.append(node)
 
     def simulate_step(self, dt: float):
@@ -167,6 +161,7 @@ class NetworkMesh:
         print(f"Step {int(self.time)}: Time={self.time:.1f}, Active nodes={active_nodes}, "
               f"Connections={len(connections)}, Battery levels: "
               f"min={min(n.battery_level for n in self.nodes):.1f}, "
+              f"max={max(n.battery_level for n in self.nodes):.1f}, "
               f"avg={sum(n.battery_level for n in self.nodes)/len(self.nodes):.1f}")
 
 class Simulation:
@@ -174,7 +169,39 @@ class Simulation:
         self.mesh = NetworkMesh(bounds=size)
         self.size = size
 
-    def generate_random_nodes(self, count: int):
+    def generate_grid_nodes(self, rows: int, columns: int, index_offset: int = 0):
+        dx = self.size[0] / columns
+        dy = self.size[1] / rows
+
+        for row in range(rows):
+            for column in range(columns):
+                position = Position(
+                    x = column * dx,
+                    y = row * dy,
+                    z = self.size[2] / 2,
+                    t=0.0
+                )
+
+                protocols = {CommunicationType.BLE}  # All nodes have BLE
+                if random.random() < 0.8:  # 80% chance of having WiFi
+                    protocols.add(CommunicationType.WIFI)
+                if random.random() < 0.3:  # 30% chance of having GPS
+                    protocols.add(CommunicationType.GPS)
+                if random.random() < 0.2:  # 20% chance of having custom protocol
+                    protocols.add(CommunicationType.CUSTOM)
+
+                node = Node(
+                    id= (row + column) + index_offset,
+                    position=position,
+                    protocols=protocols,
+                    state=NodeState.ACTIVE
+                )
+                node.velocity = (0.0, 0.0, 0.0)
+                self.mesh.add_node(node)
+
+            index_offset += columns - 1
+
+    def generate_random_nodes(self, count: int, index_offset: int = 0):
         for i in range(count):
             position = Position(
                 x=random.uniform(0, self.size[0]),
@@ -193,11 +220,19 @@ class Simulation:
                 protocols.add(CommunicationType.CUSTOM)
 
             node = Node(
-                id=i,
+                id=i + index_offset,
                 position=position,
                 protocols=protocols,
                 state=NodeState.ACTIVE
             )
+
+            max_speed = 5.0  # units per second
+            node.velocity = (
+                random.uniform(-max_speed, max_speed),
+                random.uniform(-max_speed, max_speed),
+                random.uniform(-max_speed/10, max_speed/10)  # Less vertical movement
+            )
+
             self.mesh.add_node(node)
 
     def run(self, steps: int, dt: float = 1.0):
@@ -206,5 +241,6 @@ class Simulation:
 
 if __name__ == '__main__':
     sim = Simulation(size=(200.0, 200.0, 50.0))
-    sim.generate_random_nodes(20)
+    sim.generate_grid_nodes(2, 4)
+    sim.generate_random_nodes(20, 10)
     sim.run(steps=100)
