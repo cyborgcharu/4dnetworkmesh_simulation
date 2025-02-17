@@ -305,7 +305,7 @@ class Simulation:
             plt.show() 
 
 if __name__ == '__main__':
-    sim = Simulation(size=(200.0, 200.0, 50.0))
+    sim = Simulation(size=(25.0, 25.0, 10.0))
     
     sim.generate_random_nodes(20)
     
