@@ -161,6 +161,8 @@ class NetworkMesh:
                                     connections.append((node.id, other_node.id, protocol))
                                     node.store_encounter(other_node, self.time)
                                     break
+                elif active_nodes > 0:
+                    active_nodes -= 1
 
         print(f"Step {int(self.time)}: Time={self.time:.1f}, Active nodes={active_nodes}, "
               f"Connections={len(connections)}, Battery levels: "
