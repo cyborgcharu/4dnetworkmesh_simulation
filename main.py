@@ -136,10 +136,10 @@ class NetworkMesh:
         connections = []
 
         for node in self.nodes:
-            if node.state != NodeState.OFFLINE:
-                # Update position
-                node.update_position(dt)
-
+            # Update position
+            node.update_position(dt)
+            
+            if node.state != NodeState.OFFLINE:    
                 # Boundary checking
                 for i in range(3):
                     if node.position.x < 0 or node.position.x > self.bounds[0]:
