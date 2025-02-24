@@ -139,16 +139,15 @@ class NetworkMesh:
             # Update position
             node.update_position(dt)
             
-            if node.state != NodeState.OFFLINE:    
-                # Boundary checking
-                for i in range(3):
-                    if node.position.x < 0 or node.position.x > self.bounds[0]:
-                        node.velocity = (-node.velocity[0], node.velocity[1], node.velocity[2])
-                    if node.position.y < 0 or node.position.y > self.bounds[1]:
-                        node.velocity = (node.velocity[0], -node.velocity[1], node.velocity[2])
-                    if node.position.z < 0 or node.position.z > self.bounds[2]:
-                        node.velocity = (node.velocity[0], node.velocity[1], -node.velocity[2])
+            # Boundary checking
+            if node.position.x < 0 or node.position.x > self.bounds[0]:
+                node.velocity = (-node.velocity[0], node.velocity[1], node.velocity[2])
+            if node.position.y < 0 or node.position.y > self.bounds[1]:
+                node.velocity = (node.velocity[0], -node.velocity[1], node.velocity[2])
+            if node.position.z < 0 or node.position.z > self.bounds[2]:
+                node.velocity = (node.velocity[0], node.velocity[1], -node.velocity[2])
 
+            if node.state != NodeState.OFFLINE:
                 # Drain battery based on active protocols
                 total_drain = sum(Node.BATTERY_DRAIN_RATES[p] for p in node.protocols)
                 node.drain_battery(total_drain * dt)
