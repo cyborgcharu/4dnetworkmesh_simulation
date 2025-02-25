@@ -147,6 +147,7 @@ class NetworkMesh:
             if node.position.z < 0 or node.position.z > self.bounds[2]:
                 node.velocity = (node.velocity[0], node.velocity[1], -node.velocity[2])
 
+        for node in self.nodes:
             if node.state != NodeState.OFFLINE:
                 # Drain battery based on active protocols
                 total_drain = sum(Node.BATTERY_DRAIN_RATES[p] for p in node.protocols)
