@@ -15,6 +15,7 @@ class CommunicationType(Enum):
 
 class NodeState(Enum):
     ACTIVE = "ACTIVE"
+    SLEEP = "SLEEP"
     OFFLINE = "OFFLINE"
     INTERMITTENT = "INTERMITTENT"
 
@@ -99,7 +100,9 @@ class Node:
         if (protocol not in self.protocols or
             protocol not in other.protocols or
             self.state == NodeState.OFFLINE or
-            other.state == NodeState.OFFLINE):
+            other.state == NodeState.OFFLINE or
+            self.state == NodeState.SLEEP or
+            other.state == NodeState.SLEEP):
             return False
 
         # Intermittent nodes have sporadic connectivity
@@ -112,6 +115,16 @@ class Node:
         # Add noise to effective range based on environmental factors
         effective_range = self.PROTOCOL_RANGES[protocol] * (0.9 + random.random() * 0.2)
         return distance <= effective_range
+
+@dataclass
+class LpNode(Node):
+    wakeup_interval: float = 0
+
+    def update_state(self, time: float):
+        if (time % self.wakeup_interval) == 0:
+            self.state = NodeState.ACTIVE
+        elif self.state != NodeState.OFFLINE:
+            self.state = NodeState.SLEEP
 
 class NetworkMesh:
     def __init__(self, bounds: Tuple[float, float, float] = (1000.0, 1000.0, 100.0)):
@@ -147,14 +160,19 @@ class NetworkMesh:
             if node.position.z < 0 or node.position.z > self.bounds[2]:
                 node.velocity = (node.velocity[0], node.velocity[1], -node.velocity[2])
 
+            if isinstance(node, LpNode):
+                node.update_state(self.time)
+
         for node in self.nodes:
-            if node.state != NodeState.OFFLINE:
+            if (node.state != NodeState.OFFLINE and
+                node.state != NodeState.SLEEP):
                 # Drain battery based on active protocols
                 total_drain = sum(Node.BATTERY_DRAIN_RATES[p] for p in node.protocols)
                 node.drain_battery(total_drain * dt)
 
                 # Check for connections
-                if node.state == NodeState.ACTIVE:
+                if (node.state == NodeState.ACTIVE or
+                    node.state == NodeState.INTERMITTENT):
                     active_nodes += 1
                     for other_node in self.nodes:
                         if node.id != other_node.id:
@@ -163,8 +181,6 @@ class NetworkMesh:
                                     connections.append((node.id, other_node.id, protocol))
                                     node.store_encounter(other_node, self.time)
                                     break
-                elif active_nodes > 0:
-                    active_nodes -= 1
 
         print(f"Step {int(self.time)}: Time={self.time:.1f}, Active nodes={active_nodes}, "
               f"Connections={len(connections)}, Battery levels: "
@@ -194,6 +210,7 @@ class NetworkVisualizer:
         # Node state colors
         self.state_colors = {
             NodeState.ACTIVE: '#2ecc71',         # Green
+            NodeState.SLEEP: '#9abddc',          # Light Blue
             NodeState.OFFLINE: '#e74c3c',        # Red
             NodeState.INTERMITTENT: '#f1c40f'    # Yellow
         }
@@ -280,12 +297,23 @@ class Simulation:
             if random.random() < 0.2:  # 20% chance of having custom protocol
                 protocols.add(CommunicationType.CUSTOM)
 
-            node = Node(
-                id=i,
-                position=position,
-                protocols=protocols,
-                state=NodeState.ACTIVE
-            )
+            # 60% chance of being a Low-Power node
+            if random.random() < 0.6:
+                wakeup_interval = math.floor(random.uniform(2, 6))
+                node = LpNode(
+                    id=i,
+                    position=position,
+                    protocols=protocols,
+                    state=NodeState.ACTIVE,
+                    wakeup_interval=wakeup_interval
+                )
+            else:
+                node = Node(
+                    id=i,
+                    position=position,
+                    protocols=protocols,
+                    state=NodeState.ACTIVE
+                )
             self.mesh.add_node(node)
 
     def run(self, steps: int, dt: float = 1.0, visualize: bool = True):
@@ -309,4 +337,4 @@ if __name__ == '__main__':
 
     sim.generate_random_nodes(20)
 
-    sim.run(steps=100, dt=1.0, visualize=True)
+    sim.run(steps=3000, dt=1.0, visualize=True)
