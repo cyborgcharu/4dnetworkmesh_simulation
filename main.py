@@ -138,7 +138,7 @@ class NetworkMesh:
         for node in self.nodes:
             # Update position
             node.update_position(dt)
-            
+
             # Boundary checking
             if node.position.x < 0 or node.position.x > self.bounds[0]:
                 node.velocity = (-node.velocity[0], node.velocity[1], node.velocity[2])
@@ -169,7 +169,7 @@ class NetworkMesh:
               f"Connections={len(connections)}, Battery levels: "
               f"min={min(n.battery_level for n in self.nodes):.1f}, "
               f"avg={sum(n.battery_level for n in self.nodes)/len(self.nodes):.1f}")
-        
+
         return connections
 
 class NetworkVisualizer:
@@ -179,9 +179,9 @@ class NetworkVisualizer:
         self.pos = {}
         self.node_colors = []
         self.edge_colors = []
-        
+
         self.fig = plt.figure(figsize=(12, 8))
-        
+
         # Color mapping for different protocols
         self.protocol_colors = {
             CommunicationType.BLE: '#1f77b4',    # Blue
@@ -189,7 +189,7 @@ class NetworkVisualizer:
             CommunicationType.GPS: '#ff7f0e',    # Orange
             CommunicationType.CUSTOM: '#9467bd'  # Purple
         }
-        
+
         # Node state colors
         self.state_colors = {
             NodeState.ACTIVE: '#2ecc71',         # Green
@@ -202,15 +202,15 @@ class NetworkVisualizer:
         self.G.clear()
         self.node_colors = []
         self.edge_colors = []
-        
+
 
         for node in self.mesh.nodes:
             self.G.add_node(node.id)
 
             self.pos[node.id] = (node.position.x, node.position.y)
-            
+
             self.node_colors.append(self.state_colors[node.state])
-            
+
             self.G.nodes[node.id]['battery'] = node.battery_level
             self.G.nodes[node.id]['protocols'] = [p.value for p in node.protocols]
             self.G.nodes[node.id]['state'] = node.state.value
@@ -223,23 +223,23 @@ class NetworkVisualizer:
     def draw(self):
         """Draws the current state of the network"""
         plt.clf()
-        
 
-        nx.draw_networkx_nodes(self.G, self.pos, 
+
+        nx.draw_networkx_nodes(self.G, self.pos,
                              node_color=self.node_colors,
                              node_size=300)
-        
-        if self.edge_colors:  
+
+        if self.edge_colors:
             nx.draw_networkx_edges(self.G, self.pos,
                                  edge_color=self.edge_colors,
                                  width=2, alpha=0.5)
-        
-        labels = {node: f"Node {node}\n{self.G.nodes[node]['battery']:.0f}%" 
+
+        labels = {node: f"Node {node}\n{self.G.nodes[node]['battery']:.0f}%"
                  for node in self.G.nodes()}
         nx.draw_networkx_labels(self.G, self.pos, labels, font_size=8)
-        
+
         legend_elements = [
-            plt.Line2D([0], [0], marker='o', color='w', 
+            plt.Line2D([0], [0], marker='o', color='w',
                       markerfacecolor=color, label=state.value, markersize=10)
             for state, color in self.state_colors.items()
         ] + [
@@ -247,13 +247,13 @@ class NetworkVisualizer:
             for proto, color in self.protocol_colors.items()
         ]
         plt.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1))
-        
+
         plt.title(f'Network Mesh State (t={self.mesh.time:.1f}s)')
         plt.axis('off')
         plt.tight_layout()
-        
+
         plt.draw()
-        plt.pause(0.1) 
+        plt.pause(0.1)
 
 class Simulation:
     def __init__(self, size: Tuple[float, float, float] = (1000.0, 1000.0, 100.0)):
@@ -291,21 +291,21 @@ class Simulation:
         if visualize:
             self.visualizer = NetworkVisualizer(self.mesh)
             plt.ion()
-        
+
         for step in range(steps):
             connections = self.mesh.simulate_step(dt)
-            
+
             if visualize and step % 10 == 0:  # Update visualization every 10 steps
                 self.visualizer.update_graph(connections)
                 self.visualizer.draw()
-        
+
         if visualize:
-            plt.ioff()  
-            plt.show() 
+            plt.ioff()
+            plt.show()
 
 if __name__ == '__main__':
     sim = Simulation(size=(25.0, 25.0, 10.0))
-    
+
     sim.generate_random_nodes(20)
-    
+
     sim.run(steps=100, dt=1.0, visualize=True)
