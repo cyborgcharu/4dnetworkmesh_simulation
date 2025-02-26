@@ -163,13 +163,15 @@ class NetworkMesh:
             if isinstance(node, LpNode):
                 node.update_state(self.time)
 
-        for node in self.nodes:
             if (node.state != NodeState.OFFLINE and
                 node.state != NodeState.SLEEP):
                 # Drain battery based on active protocols
                 total_drain = sum(Node.BATTERY_DRAIN_RATES[p] for p in node.protocols)
                 node.drain_battery(total_drain * dt)
 
+        for node in self.nodes:
+            if (node.state != NodeState.OFFLINE and
+                node.state != NodeState.SLEEP):
                 # Check for connections
                 if (node.state == NodeState.ACTIVE or
                     node.state == NodeState.INTERMITTENT):
