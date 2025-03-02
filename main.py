@@ -134,7 +134,7 @@ class NetworkMesh:
 
     def add_node(self, node: Node):
         # Initialize with random velocity
-        max_speed_meters_per_second = 1.0  # meters per second
+        max_speed_meters_per_second = 2.0  # meters per second
         node.velocity_meters_per_second = (
             random.uniform(-max_speed_meters_per_second, max_speed_meters_per_second),
             random.uniform(-max_speed_meters_per_second, max_speed_meters_per_second),
@@ -334,7 +334,7 @@ class Simulation:
         for step in range(steps):
             connections = self.mesh.simulate_step(dt_seconds)
 
-            if visualize and step % 10 == 0:  # Update visualization every 10 steps
+            if visualize and step % 1 == 0:  # Update visualization every step
                 self.visualizer.update_graph(connections)
                 self.visualizer.draw()
 
