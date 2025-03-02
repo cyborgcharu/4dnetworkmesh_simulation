@@ -11,7 +11,6 @@ class CommunicationType(Enum):
     BLE = "BLE"          # Short range (<10m)
     WIFI = "WIFI"        # Mid range (10-100m)
     UPLINK = "UPLINK"    # Communication to a wired network, not subject to limitations
-    CUSTOM = "CUSTOM"    # Custom protocol (i.e. audio-based)
 
 class NodeState(Enum):
     ACTIVE = "ACTIVE"
@@ -57,7 +56,6 @@ class Node:
         CommunicationType.BLE: 10.0,
         CommunicationType.WIFI: 100.0,
         CommunicationType.UPLINK: float('inf'),
-        CommunicationType.CUSTOM: 50.0
     }
 
     # rates of battery consumption for protocols
@@ -65,7 +63,6 @@ class Node:
         CommunicationType.BLE: 0.01,
         CommunicationType.WIFI: 0.05,
         CommunicationType.UPLINK: 0.0,
-        CommunicationType.CUSTOM: 0.03
     }
 
     def update_position(self, dt: float):
@@ -206,7 +203,6 @@ class NetworkVisualizer:
             CommunicationType.BLE: '#1f77b4',    # Blue
             CommunicationType.WIFI: '#9467bd',   # Purple
             CommunicationType.UPLINK: '#2ca02c', # Green
-            CommunicationType.CUSTOM: '#9467bd'  # Purple
         }
 
         # Node state colors
@@ -296,8 +292,6 @@ class Simulation:
                 protocols.add(CommunicationType.WIFI)
             if random.random() < 0.3:  # 30% chance of having an up-link to Internet or local network
                 protocols.add(CommunicationType.UPLINK)
-            if random.random() < 0.2:  # 20% chance of having custom protocol
-                protocols.add(CommunicationType.CUSTOM)
 
             # 60% chance of being a Low-Power node
             if random.random() < 0.6:
