@@ -36,7 +36,7 @@ class Position:
 class NetworkPacket:
     source_id: int
     target_id: Optional[int]
-    timestamp: float
+    timestamp_seconds: float
     data: Dict
     hop_count: int = 0
     ttl: int = 10
@@ -44,12 +44,14 @@ class NetworkPacket:
 @dataclass
 class Node:
     id: int
-    position: Position
+    # Meters
+    position_meters: Position
     state: NodeState = NodeState.ACTIVE
     battery_level: float = 100.0
     protocols: Set[CommunicationType] = field(default_factory=lambda: {CommunicationType.BLE})
     memory: Dict = field(default_factory=dict)
-    velocity: Tuple[float, float, float] = field(default_factory=lambda: (0.0, 0.0, 0.0))
+    # Meter per second
+    velocity_meters_per_second: Tuple[float, float, float] = field(default_factory=lambda: (0.0, 0.0, 0.0))
 
     # ranges of distance for protocols
     PROTOCOL_RANGES = {
@@ -65,11 +67,11 @@ class Node:
         CommunicationType.UPLINK: 0.0,
     }
 
-    def update_position(self, dt: float):
-        self.position.x += self.velocity[0] * dt
-        self.position.y += self.velocity[1] * dt
-        self.position.z += self.velocity[2] * dt
-        self.position.t += dt
+    def update_position(self, dt_seconds: float):
+        self.position_meters.x += self.velocity_meters_per_second[0] * dt_seconds
+        self.position_meters.y += self.velocity_meters_per_second[1] * dt_seconds
+        self.position_meters.z += self.velocity_meters_per_second[2] * dt_seconds
+        self.position_meters.t += dt_seconds
 
     def drain_battery(self, amount: float):
         actual_drain = amount * (0.8 + random.random() * 0.4)  # 20% variance
@@ -82,14 +84,14 @@ class Node:
             if random.random() < 0.3:  # 30% chance of going intermittent when low battery
                 self.state = NodeState.INTERMITTENT
 
-    def store_encounter(self, other_node: 'Node', timestamp: float):
+    def store_encounter(self, other_node: 'Node', timestamp_seconds: float):
         """Records when this node encounters another node"""
         if 'encounters' not in self.memory:
             self.memory['encounters'] = []
         self.memory['encounters'].append({
             'node_id': other_node.id,
-            'timestamp': timestamp,
-            'position': (other_node.position.x, other_node.position.y, other_node.position.z),
+            'timestamp_seconds': timestamp_seconds,
+            'position_meters': (other_node.position_meters.x, other_node.position_meters.y, other_node.position_meters.z),
             'protocol': [p for p in self.protocols & other_node.protocols][0].value
         })
 
@@ -107,7 +109,7 @@ class Node:
             if random.random() > 0.3:  # 70% chance of failed communication
                 return False
 
-        distance = self.position.distance_to(other.position)
+        distance = self.position_meters.distance_to(other.position_meters)
 
         # Add noise to effective range based on environmental factors
         effective_range = self.PROTOCOL_RANGES[protocol] * (0.9 + random.random() * 0.2)
@@ -117,8 +119,8 @@ class Node:
 class LpNode(Node):
     wakeup_interval: float = 0
 
-    def update_state(self, time: float):
-        if (time % self.wakeup_interval) == 0:
+    def update_state(self, time_seconds: float):
+        if (time_seconds % self.wakeup_interval) == 0:
             self.state = NodeState.ACTIVE
         elif self.state != NodeState.OFFLINE:
             self.state = NodeState.SLEEP
@@ -126,45 +128,57 @@ class LpNode(Node):
 class NetworkMesh:
     def __init__(self, bounds: Tuple[float, float, float] = (1000.0, 1000.0, 100.0)):
         self.nodes: List[Node] = []
-        self.time: float = 0.0
+        self.time_seconds: float = 0.0
         self.packets: List[NetworkPacket] = []
         self.bounds = bounds
 
     def add_node(self, node: Node):
         # Initialize with random velocity
-        max_speed = 5.0  # units per second
-        node.velocity = (
-            random.uniform(-max_speed, max_speed),
-            random.uniform(-max_speed, max_speed),
-            random.uniform(-max_speed/10, max_speed/10)
+        max_speed_meters_per_second = 1.0  # meters per second
+        node.velocity_meters_per_second = (
+            random.uniform(-max_speed_meters_per_second, max_speed_meters_per_second),
+            random.uniform(-max_speed_meters_per_second, max_speed_meters_per_second),
+            random.uniform(-max_speed_meters_per_second/10, max_speed_meters_per_second/10)
         )
         self.nodes.append(node)
 
-    def simulate_step(self, dt: float):
-        self.time += dt
+    def simulate_step(self, dt_seconds: float):
+        self.time_seconds += dt_seconds
         active_nodes = 0
         connections = []
 
         for node in self.nodes:
             # Update position
-            node.update_position(dt)
+            node.update_position(dt_seconds)
 
             # Boundary checking
-            if node.position.x < 0 or node.position.x > self.bounds[0]:
-                node.velocity = (-node.velocity[0], node.velocity[1], node.velocity[2])
-            if node.position.y < 0 or node.position.y > self.bounds[1]:
-                node.velocity = (node.velocity[0], -node.velocity[1], node.velocity[2])
-            if node.position.z < 0 or node.position.z > self.bounds[2]:
-                node.velocity = (node.velocity[0], node.velocity[1], -node.velocity[2])
+            if node.position_meters.x < 0 or node.position_meters.x > self.bounds[0]:
+                node.velocity_meters_per_second = (
+                    -node.velocity_meters_per_second[0],
+                    node.velocity_meters_per_second[1],
+                    node.velocity_meters_per_second[2]
+                )
+            if node.position_meters.y < 0 or node.position_meters.y > self.bounds[1]:
+                node.velocity_meters_per_second = (
+                    node.velocity_meters_per_second[0],
+                    -node.velocity_meters_per_second[1],
+                    node.velocity_meters_per_second[2]
+                )
+            if node.position_meters.z < 0 or node.position_meters.z > self.bounds[2]:
+                node.velocity_meters_per_second = (
+                    node.velocity_meters_per_second[0],
+                    node.velocity_meters_per_second[1],
+                    -node.velocity_meters_per_second[2]
+                )
 
             if isinstance(node, LpNode):
-                node.update_state(self.time)
+                node.update_state(self.time_seconds)
 
             if (node.state != NodeState.OFFLINE and
                 node.state != NodeState.SLEEP):
                 # Drain battery based on active protocols
                 total_drain = sum(Node.BATTERY_DRAIN_RATES[p] for p in node.protocols)
-                node.drain_battery(total_drain * dt)
+                node.drain_battery(total_drain * dt_seconds)
 
         for node in self.nodes:
             if (node.state != NodeState.OFFLINE and
@@ -178,10 +192,10 @@ class NetworkMesh:
                             for protocol in CommunicationType:
                                 if node.can_communicate_with(other_node, protocol):
                                     connections.append((node.id, other_node.id, protocol))
-                                    node.store_encounter(other_node, self.time)
+                                    node.store_encounter(other_node, self.time_seconds)
                                     break
 
-        print(f"Step {int(self.time)}: Time={self.time:.1f}, Active nodes={active_nodes}, "
+        print(f"Step {int(self.time_seconds)}: Time={self.time_seconds:.1f}, Active nodes={active_nodes}, "
               f"Connections={len(connections)}, Battery levels: "
               f"min={min(n.battery_level for n in self.nodes):.1f}, "
               f"avg={sum(n.battery_level for n in self.nodes)/len(self.nodes):.1f}")
@@ -223,7 +237,7 @@ class NetworkVisualizer:
         for node in self.mesh.nodes:
             self.G.add_node(node.id)
 
-            self.pos[node.id] = (node.position.x, node.position.y)
+            self.pos[node.id] = (node.position_meters.x, node.position_meters.y)
 
             self.node_colors.append(self.state_colors[node.state])
 
@@ -264,7 +278,7 @@ class NetworkVisualizer:
         ]
         plt.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1))
 
-        plt.title(f'Network Mesh State (t={self.mesh.time:.1f}s)')
+        plt.title(f'Network Mesh State (t={self.mesh.time_seconds:.1f}s)')
         plt.axis('off')
         plt.tight_layout()
 
@@ -272,17 +286,17 @@ class NetworkVisualizer:
         plt.pause(0.1)
 
 class Simulation:
-    def __init__(self, size: Tuple[float, float, float] = (1000.0, 1000.0, 100.0)):
-        self.mesh = NetworkMesh(bounds=size)
-        self.size = size
+    def __init__(self, size_meters: Tuple[float, float, float] = (100.0, 100.0, 10.0)):
+        self.mesh = NetworkMesh(bounds=size_meters)
+        self.size_meters = size_meters
         self.visualizer = None
 
     def generate_random_nodes(self, count: int):
         for i in range(count):
-            position = Position(
-                x=random.uniform(0, self.size[0]),
-                y=random.uniform(0, self.size[1]),
-                z=random.uniform(0, self.size[2]),
+            position_meters = Position(
+                x=random.uniform(0, self.size_meters[0]),
+                y=random.uniform(0, self.size_meters[1]),
+                z=random.uniform(0, self.size_meters[2]),
                 t=0.0
             )
 
@@ -298,7 +312,7 @@ class Simulation:
                 wakeup_interval = math.floor(random.uniform(2, 6))
                 node = LpNode(
                     id=i,
-                    position=position,
+                    position_meters=position_meters,
                     protocols=protocols,
                     state=NodeState.ACTIVE,
                     wakeup_interval=wakeup_interval
@@ -306,19 +320,19 @@ class Simulation:
             else:
                 node = Node(
                     id=i,
-                    position=position,
+                    position_meters=position_meters,
                     protocols=protocols,
                     state=NodeState.ACTIVE
                 )
             self.mesh.add_node(node)
 
-    def run(self, steps: int, dt: float = 1.0, visualize: bool = True):
+    def run(self, steps: int, dt_seconds: float = 1.0, visualize: bool = True):
         if visualize:
             self.visualizer = NetworkVisualizer(self.mesh)
             plt.ion()
 
         for step in range(steps):
-            connections = self.mesh.simulate_step(dt)
+            connections = self.mesh.simulate_step(dt_seconds)
 
             if visualize and step % 10 == 0:  # Update visualization every 10 steps
                 self.visualizer.update_graph(connections)
@@ -329,8 +343,8 @@ class Simulation:
             plt.show()
 
 if __name__ == '__main__':
-    sim = Simulation(size=(25.0, 25.0, 10.0))
+    sim = Simulation(size_meters=(100.0, 100.0, 2.0))
 
     sim.generate_random_nodes(20)
 
-    sim.run(steps=3000, dt=1.0, visualize=True)
+    sim.run(steps=3000, dt_seconds=0.2, visualize=True)
