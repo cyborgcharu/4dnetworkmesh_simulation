@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 class CommunicationType(Enum):
     BLE = "BLE"          # Short range (<10m)
     WIFI = "WIFI"        # Mid range (10-100m)
-    GPS = "GPS"          # Long range (>100m)
+    UPLINK = "UPLINK"    # Communication to a wired network, not subject to limitations
     CUSTOM = "CUSTOM"    # Custom protocol (i.e. audio-based)
 
 class NodeState(Enum):
@@ -56,7 +56,7 @@ class Node:
     PROTOCOL_RANGES = {
         CommunicationType.BLE: 10.0,
         CommunicationType.WIFI: 100.0,
-        CommunicationType.GPS: float('inf'),
+        CommunicationType.UPLINK: float('inf'),
         CommunicationType.CUSTOM: 50.0
     }
 
@@ -64,7 +64,7 @@ class Node:
     BATTERY_DRAIN_RATES = {
         CommunicationType.BLE: 0.01,
         CommunicationType.WIFI: 0.05,
-        CommunicationType.GPS: 0.1,
+        CommunicationType.UPLINK: 0.0,
         CommunicationType.CUSTOM: 0.03
     }
 
@@ -204,8 +204,8 @@ class NetworkVisualizer:
         # Color mapping for different protocols
         self.protocol_colors = {
             CommunicationType.BLE: '#1f77b4',    # Blue
-            CommunicationType.WIFI: '#2ca02c',   # Green
-            CommunicationType.GPS: '#ff7f0e',    # Orange
+            CommunicationType.WIFI: '#9467bd',   # Purple
+            CommunicationType.UPLINK: '#2ca02c', # Green
             CommunicationType.CUSTOM: '#9467bd'  # Purple
         }
 
@@ -294,8 +294,8 @@ class Simulation:
             protocols = {CommunicationType.BLE}  # All nodes have BLE
             if random.random() < 0.7:  # 70% chance of having WiFi
                 protocols.add(CommunicationType.WIFI)
-            if random.random() < 0.3:  # 30% chance of having GPS
-                protocols.add(CommunicationType.GPS)
+            if random.random() < 0.3:  # 30% chance of having an up-link to Internet or local network
+                protocols.add(CommunicationType.UPLINK)
             if random.random() < 0.2:  # 20% chance of having custom protocol
                 protocols.add(CommunicationType.CUSTOM)
 
